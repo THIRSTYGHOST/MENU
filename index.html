@@ -111,6 +111,13 @@ body{background:var(--shadow);color:var(--ash);font-family:'Oswald',sans-serif;m
 .success-close{margin-top:10px;background:none;border:1px solid rgba(139,0,0,.5);border-radius:6px;color:#6a4030;font-family:'Oswald',sans-serif;font-size:12px;letter-spacing:3px;padding:10px 28px;cursor:pointer;text-transform:uppercase;transition:all .2s;}
 .success-close:hover{border-color:var(--blood);color:var(--ash);}
 .cart-empty{text-align:center;padding:20px;font-family:'Creepster',cursive;font-size:18px;color:#4a2010;letter-spacing:2px;}
+.name-input-wrap{margin-bottom:16px;}
+.name-label{font-family:'Cinzel',serif;font-size:10px;letter-spacing:4px;color:#5a3020;text-transform:uppercase;margin-bottom:8px;display:block;}
+.customer-name-input{width:100%;background:rgba(10,2,2,0.9);border:1px solid rgba(139,0,0,0.5);border-radius:6px;color:var(--ash);font-family:'Oswald',sans-serif;font-size:15px;padding:10px 14px;letter-spacing:1px;outline:none;transition:border-color 0.2s;}
+.customer-name-input::placeholder{color:#5a3020;font-size:13px;}
+.customer-name-input:focus{border-color:var(--blood-glow);box-shadow:0 0 8px rgba(204,17,0,0.3);}
+.name-error{color:#cc2200;font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:1px;margin-top:4px;display:none;}
+.name-error.visible{display:block;}
 .welcome-screen{position:fixed;inset:0;background:#060101;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;animation:wout .6s ease 2.8s both;}
 @keyframes wout{to{opacity:0;pointer-events:none;visibility:hidden;}}
 .welcome-logo{width:160px;height:160px;object-fit:contain;filter:drop-shadow(0 0 20px rgba(204,17,0,.8));animation:win .5s ease both;margin-bottom:0;}
@@ -318,6 +325,11 @@ body{background:var(--shadow);color:var(--ash);font-family:'Oswald',sans-serif;m
     <div class="modal-title">&#x2620; Your Order &#x2620;</div>
     <div class="modal-sub">Review before sending to the kitchen</div>
     <div class="cart-items-list" id="cartItemsList"><div class="cart-empty">Your cart is empty, soul.</div></div>
+    <div class="name-input-wrap">
+      <span class="name-label">&#x1F480; Your Name</span>
+      <input type="text" id="customerName" class="customer-name-input" placeholder="Enter your name..." maxlength="30" oninput="chkReady()">
+      <div class="name-error" id="nameError">Please enter your name to place order</div>
+    </div>
     <div style="margin-bottom:16px;">
       <div class="modal-sub" style="text-align:left;margin-bottom:10px;">&#x26B0; Select Your Table</div>
       <div class="table-grid">
@@ -464,7 +476,11 @@ function selectTable(num) {
 }
 
 function chkReady() {
-  document.getElementById('placeOrderBtn').disabled = !(Object.keys(cart).length > 0 && selTable !== null);
+  var name = document.getElementById('customerName').value.trim();
+  var hasItems = Object.keys(cart).length > 0;
+  var hasTable = selTable !== null;
+  var hasName = name.length > 0;
+  document.getElementById('placeOrderBtn').disabled = !(hasItems && hasTable && hasName);
 }
 
 function placeOrder() {
@@ -474,6 +490,14 @@ function placeOrder() {
   btn.disabled = true;
   btn.textContent = 'Sending...';
 
+  var customerName = document.getElementById('customerName').value.trim();
+  if (!customerName) {
+    document.getElementById('nameError').classList.add('visible');
+    btn.disabled = false;
+    btn.innerHTML = '&#x1FA78; SEND ORDER TO KITCHEN &#x1FA78;';
+    return;
+  }
+  document.getElementById('nameError').classList.remove('visible');
   var time = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
   var date = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
   var tableName = tableNames[selTable] || ('Table ' + selTable);
@@ -494,18 +518,20 @@ function placeOrder() {
 
   // ── Send via Telegram Bot ───────────────────────────
   var tgMsg = encodeURIComponent(
-    '\u1F6D2 NEW ORDER\n'
+    '\uD83D\uDED2 NEW ORDER\n'
     + '================================\n'
-    + '\u{1F4CD} TABLE : ' + tableName + '\n'
-    + '\u{1F4C5} DATE  : ' + date + '\n'
-    + '\u23F0 TIME  : ' + time + '\n'
+    + '\uD83D\uDC64 CUSTOMER : ' + customerName + '\n'
+    + '\uD83D\uDCCD TABLE    : ' + tableName + '\n'
+    + '\uD83D\uDCC5 DATE     : ' + date + '\n'
+    + '\u23F0 TIME     : ' + time + '\n'
     + '--------------------------------\n'
-    + '\u{1F4CB} ITEMS:\n'
+    + '\uD83D\uDCCB ITEMS:\n'
     + itemLinesEmail
     + '--------------------------------\n'
     + 'Total Items: ' + keys.length + '\n'
     + '================================\n'
-    + '\u26A0\uFE0F Serve at: ' + tableName
+    + '\u26A0\uFE0F Serve at: ' + tableName + '\n'
+    + 'Customer: ' + customerName
   );
 
   var tgUrl = 'https://api.telegram.org/bot' + TELEGRAM_BOT_TOKEN
@@ -515,12 +541,13 @@ function placeOrder() {
 
   // ── Send Email via EmailJS (backup) ─────────────────
   var emailParams = {
-    to_email:    'madhumardoor30@gmail.com',
-    table_name:  tableName,
-    order_date:  date,
-    order_time:  time,
-    order_items: itemLinesEmail,
-    total_items: keys.length
+    to_email:       'madhumardoor30@gmail.com',
+    customer_name:  customerName,
+    table_name:     tableName,
+    order_date:     date,
+    order_time:     time,
+    order_items:    itemLinesEmail,
+    total_items:    keys.length
   };
 
   // Fire both simultaneously
@@ -537,6 +564,8 @@ function placeOrder() {
   // Show success immediately
   closeCart();
   document.getElementById('successTable').textContent = tableName;
+  document.getElementById('successOverlay').querySelector('.success-msg').innerHTML =
+    'Hi <strong style="color:var(--ash)">' + customerName + '</strong>! Your order has been received.<br>Sit back and let the darkness serve you.';
   document.getElementById('successOverlay').classList.add('open');
   resetCart();
   btn.disabled = false;
@@ -555,6 +584,8 @@ function resetCart() {
   }
   cart = {};
   selTable = null;
+  var nameEl = document.getElementById('customerName');
+  if (nameEl) nameEl.value = '';
   updFab();
 }
 
